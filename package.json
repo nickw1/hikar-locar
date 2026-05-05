@@ -1,0 +1,21 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "@types/pg": "^8.20.0",
+    "@types/three": "^0.183.1",
+    "express": "^5.2.1",
+    "locar": "file:../locar.js/locar-0.2.0-pre31.tgz",
+    "locar-tiler": "^0.6.0",
+    "pg": "^8.20.0",
+    "vite-express": "^0.22.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8"
+  },
+  "scripts": {
+    "dev": "tsc && tsx server.ts"
+  }
+}
