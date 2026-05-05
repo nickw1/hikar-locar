@@ -11,8 +11,8 @@ try {
     locar.setElevation(100);
     let dem;
     const demApplier = new DemApplier(  
-       dem = new DemTiler("https://hikar.org/webapp/dem/{z}/{x}/{y}.png"),
-       new JsonTiler("https://hikar.org/webapp/map/{z}/{x}/{y}.json?outProj=4326")
+       dem = new DemTiler("/dem/{z}/{x}/{y}.png"),
+       new JsonTiler("/map/{z}/{x}/{y}.json?outProj=4326")
     );
 
     const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
@@ -23,7 +23,7 @@ try {
     locar.on("gpsupdate", async(ev: LocAR.GpsReceivedEvent) => {
        
         if(ev.distMoved > 10 || first) {    
-            first = false;  
+            
             const lonLat =  new LonLat(
                 ev.position.coords.longitude,
                 ev.position.coords.latitude
@@ -32,12 +32,14 @@ try {
             const tiles = await demApplier.updateByLonLat(
                lonLat
             )
-            alert(`got tiles: lon ${lonLat.lon} lat ${lonLat.lat} elev: ${dem.getElevationFromLonLat(lonLat)}`);
+            if(first) {
+                alert(`got tiles: lon ${lonLat.lon} lat ${lonLat.lat} elev: ${dem.getElevationFromLonLat(lonLat)}`);
+                first = false;  
+            }
             locar.setElevation(dem.getElevationFromLonLat(lonLat) + 1.6);
         
             for(let dataTile of tiles) {
                 for(let feature of (dataTile.data as FeatureCollection).features) {
-                    console.log(feature.geometry.type);
                     switch(feature.geometry.type) {
                         case 'Point':
                           const mesh = new THREE.Mesh(poiGeom, poiMaterial);

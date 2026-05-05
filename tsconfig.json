@@ -5,8 +5,8 @@
         "skipLibCheck": true,
         "target" : "esnext",
         "esModuleInterop": true,
-        "module": "nodenext",
-        "moduleResolution": "nodenext"
+        "module": "preserve",
+        "moduleResolution": "bundler"
     }, 
     "files" : [ "server.ts", "src/main.ts" ]
 }
