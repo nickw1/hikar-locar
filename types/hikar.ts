@@ -1,6 +1,5 @@
 import { LonLat } from 'locar-tiler';
 
-
 export interface LayerInfo {
     cols: string;
     table: string;
