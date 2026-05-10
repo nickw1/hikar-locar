@@ -2,9 +2,14 @@ import * as THREE from 'three';
 import { App, GpsReceivedEvent, LocAR } from 'locar';
 import { DemApplier, DemTiler, FeatureCollection, JsonTiler, LineString, LonLat, MultiLineString, Point } from 'locar-tiler';
 
-const camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 1000);
-const app = new App({ camera });
+const app = new App({ cameraOptions : { hFov: 80, near: 0.1, far: 1000 } });
 
+const colours : Map <string, number> = new Map([
+  ["path" , 0x00ff00 ],
+  ["footway" , 0x00ff00 ],
+  ["bridleway" , 0xaa5500 ],
+  ["cycleway" , 0x0000ff ]
+]);
 
 try {
     const locar = await app.start();
@@ -15,7 +20,7 @@ try {
        new JsonTiler("/map/{z}/{x}/{y}.json?outProj=4326")
     );
 
-    const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+   
     const poiMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
     const poiGeom = new THREE.BoxGeometry(10, 10, 10);
     let first = true;
@@ -46,6 +51,8 @@ try {
         
         for(let dataTile of tiles) {
           for(let feature of (dataTile.data as FeatureCollection).features) {
+            const hwy = feature.properties.get("highway");
+          
             switch(feature.geometry.type) {
               case 'Point':
                 const mesh = new THREE.Mesh(poiGeom, poiMaterial);
@@ -54,19 +61,25 @@ try {
                 break;
 
               case 'LineString':
-                const lineCoords = (feature.geometry as LineString).coordinates;
-                if(lineCoords.length >= 2) {
-                  locar.addGeoLine(lineCoords, lineMaterial);
+                if(hwy) {
+                  const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });
+                  const lineCoords = (feature.geometry as LineString).coordinates;
+                  if(lineCoords.length >= 2) {
+                    locar.addGeoLine(lineCoords, lineMaterial);
+                  }
                 }
                 break;
 
               case 'MultiLineString':
-                const mlsCoords = (feature.geometry as MultiLineString).coordinates;
-                for(let lineCoords of mlsCoords) {
-                  if(lineCoords.length >= 2) {
-                    locar.addGeoLine(lineCoords, lineMaterial);
+                if(hwy) {
+                  const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });  
+                  const mlsCoords = (feature.geometry as MultiLineString).coordinates;
+                  for(let lineCoords of mlsCoords) {
+                    if(lineCoords.length >= 2) {
+                      locar.addGeoLine(lineCoords, lineMaterial);
+                    }
                   }
-                }   
+                }  
             }
           }
         }

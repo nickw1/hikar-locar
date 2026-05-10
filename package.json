@@ -5,7 +5,7 @@
     "@types/pg": "^8.20.0",
     "@types/three": "^0.183.1",
     "express": "^5.2.1",
-    "locar": "file:../locar.js/locar-0.2.0-pre32.tgz",
+    "locar": "file:../locar.js/locar-0.2.0-pre44.tgz",
     "locar-tiler": "^0.7.0",
     "pg": "^8.20.0",
     "vite-express": "^0.22.1"
