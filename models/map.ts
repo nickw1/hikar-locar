@@ -47,7 +47,6 @@ export default class MapModel {
             const layer = strLayer ; 
             geomCol = this.layerData[layer].geomCol || 'way';    
             idCol = this.layerData[layer].idCol || 'osm_id';    
-
             sql = outProj && /^\d+$/.exec(outProj) ?  
                 `SELECT ${idCol}, ST_AsGeoJSON(ST_Transform(ST_Intersection(${geomCol}, bbox), ${outProj})) AS geom,${this.layerData[layer].cols} FROM ${this.layerData[layer].table}, (SELECT ST_MakeEnvelope(${bl.e},${bl.n},${tr.e},${tr.n},3857) AS bbox) AS bboxqry WHERE ${geomCol} && bbox AND (${this.layerData[layer].conditions})`:
                 `SELECT ${idCol}, ST_AsGeoJSON(ST_Intersection(${geomCol}, bbox)) AS geom,${this.layerData[layer].cols} FROM ${this.layerData[layer].table}, (SELECT ST_MakeEnvelope(${bl.e},${bl.n},${tr.e},${tr.n},3857) AS bbox) AS bboxqry WHERE ${geomCol} && bbox AND (${this.layerData[layer].conditions})` ; 
@@ -55,15 +54,16 @@ export default class MapModel {
                 const dbres = await this.db.query(sql);
                 if(dbres.rows) {
                     const features = dbres.rows.map ( row => {
-                        const props = new Map<string, string>();    
+                        const props : any = {};
+                    
                         Object.keys(row).filter (key => key != 'geom' && row[key] !== null ).forEach ( col => {
-                            props.set(col, row[col]);
+                            props[col] = row[col];
                         } );
                        
                         return {
                             type: 'Feature',
                             geometry: JSON.parse(row.geom),
-                            properties: props 
+                            properties: props
                         };
                     } ).filter ( f => ['Point', 'LineString', 'MultiLineString','Polygon','MultiPolygon'].indexOf(f.geometry.type) >= 0); // do not send back anything the client cannot deal with
                     json.features.push(...features);
@@ -75,6 +75,7 @@ export default class MapModel {
                 return Promise.reject({"error": "Database query error", "details": e});
             }
         }
+      
         return json;
     }
 }

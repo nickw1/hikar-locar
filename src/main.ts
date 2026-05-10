@@ -51,8 +51,10 @@ try {
         
         for(let dataTile of tiles) {
           for(let feature of (dataTile.data as FeatureCollection).features) {
-            const hwy = feature.properties.get("highway");
-          
+            const props = feature.properties as any;
+            
+            const hwy : string | null = props.highway;
+           
             switch(feature.geometry.type) {
               case 'Point':
                 const mesh = new THREE.Mesh(poiGeom, poiMaterial);
@@ -62,6 +64,7 @@ try {
 
               case 'LineString':
                 if(hwy) {
+                
                   const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });
                   const lineCoords = (feature.geometry as LineString).coordinates;
                   if(lineCoords.length >= 2) {
