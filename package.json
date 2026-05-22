@@ -16,6 +16,8 @@
     "vite": "^8.0.8"
   },
   "scripts": {
-    "dev": "tsc && tsx server.ts"
+    "dev": "tsc && tsx server.ts",
+    "build": "vite build",
+    "start": "NODE_ENV=production tsx server.ts"
   }
 }
