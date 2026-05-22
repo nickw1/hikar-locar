@@ -1,4 +1,4 @@
-import { Tile, EastNorth } from 'locar-tiler';
+import { Tile, EastNorth, SphMercProjection } from 'locar-tiler';
 import type { FeatureCollection, Feature } from 'locar-tiler';
 import { Pool } from 'pg';
 import type { LayerKey, LayerData } from '../types/hikar';
@@ -77,5 +77,12 @@ export default class MapModel {
         }
       
         return json;
+    }
+
+    async getByBbox([w, s, e, n]: [number, number, number, number], layers: LayerKey[], outProj: string | null = null) {
+        const proj = new SphMercProjection();
+		const sw = proj.project({longitude: w, latitude:s});
+		const ne = proj.project({longitude: e, latitude:n});
+        return await this.doGetMap(sw, ne, layers, outProj);
     }
 }

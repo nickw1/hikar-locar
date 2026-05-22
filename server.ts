@@ -65,6 +65,30 @@ app.get(['/map/:z/:x/:y.json', '/fm/ws/tsvr.php'], async (req, res) => {
     }    
 });
 
+app.get('/webapp/map', async(req, res) => {
+    try {
+        const bbox  = req.query?.bbox as string | null;
+        if(bbox && /^[0-9\.\-\,]+$/.exec(bbox)) {
+            const bboxArr = bbox.split(',').map(str => parseFloat(str));
+            if(bboxArr.length == 4) {
+                const data = await mapModel.getByBbox(
+                    bboxArr as [number, number, number, number],
+                    req.query?.layers ? (req.query.layers as string).split(",") as Array<LayerKey> : new Array<LayerKey>('ways', 'poi'), 
+                    req.query?.outProj ? (req.query.outProj as string): null
+                );
+                res.json(data);
+            } else {
+                res.status(400).json({error: 'Bbox does not have 4 values'});
+            }
+        } else {
+            res.status(400).json({error: 'Invalid bbox format'});
+        }
+    } catch(e) {
+        console.log(e);
+        res.status(500).json({error: e});
+    }
+});
+
 ViteExpress.listen(app, PORT, () => {
     console.log(`Server listening on port ${PORT}.`);
 });
