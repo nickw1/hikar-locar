@@ -43,10 +43,9 @@ try {
         const tiles = await demApplier.updateByLonLat(
           lonLat
         );
-        if(first) {
-          alert(`got tiles: lon ${lonLat.longitude} lat ${lonLat.latitude} elev: ${dem.getElevationFromLonLat(lonLat)}`);
-          first = false;  
-        }
+      
+        setMsg(`Got tiles: lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} elev: ${Math.round(dem.getElevationFromLonLat(lonLat))}m`);  
+        
         locar.setElevation(dem.getElevationFromLonLat(lonLat) + 1.6);
         
         for(let dataTile of tiles) {
@@ -97,4 +96,8 @@ try {
 
 } catch(e: any) {
     alert(e);
+}
+
+function setMsg(msg: string) {
+  document.getElementById("msg")!.innerHTML = msg;
 }
