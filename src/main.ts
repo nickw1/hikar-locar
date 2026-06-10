@@ -38,18 +38,19 @@ try {
         ev.position.coords.latitude
       );
 
+     
       if(lastLonLat !== null) {
         distSinceUpdate = LocAR.haversineDist(lonLat, lastLonLat);
       }
       
       if(distSinceUpdate > 10) {    
         lastLonLat = lonLat;
-        setMsg("Downloading new data...");
+        setMsg("Downloading new data...", "loadMsg");
         const tiles = await demApplier.updateByLonLat(
           lonLat
         );
       
-        tiles.length > 0 ? setMsg("Downloaded data.") : showLocation(lonLat);
+        setMsg("", "loadMsg");
 
         locar.setElevation(dem!.getElevationFromLonLat(lonLat) + 1.6);
         
@@ -96,9 +97,8 @@ try {
             }
           }
         }
-      } else {
-        showLocation(lonLat); 
       }
+       showLocation(lonLat);
     });
     locar.startGps();
 
@@ -110,10 +110,10 @@ try {
     alert(e);
 }
 
-function setMsg(msg: string) {
-  document.getElementById("msg")!.innerHTML = msg;
+function setMsg(msg: string, elementId: string = "msg") {
+  document.getElementById(elementId)!.innerHTML = msg;
 }
 
-function showLocation(lonLat: LonLat) {
+function showLocation(lonLat: LonLat) { 
    setMsg(`Lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} ${dem === null ? "" : `elev: ${Math.round(dem.getElevationFromLonLat(lonLat))}m`}`);  
 }
