@@ -11,10 +11,14 @@ const colours : Map <string, number> = new Map([
   ["cycleway" , 0x0000ff ]
 ]);
 
+let dem : DemTiler | null = null;
+
+const indexedObjects = new Map<String, THREE.Mesh>();
+
 try {
     const locar = await app.start();
     locar.setElevation(100);
-    let dem;
+    
     const demApplier = new DemApplier(  
        dem = new DemTiler("/dem/{z}/{x}/{y}.png"),
        new JsonTiler("/map/{z}/{x}/{y}.json?outProj=4326")
@@ -23,7 +27,7 @@ try {
    
     const poiMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
     const poiGeom = new THREE.BoxGeometry(10, 10, 10);
-    let first = true;
+   
     let lastLonLat: LonLat | null = null;
     let distSinceUpdate = Number.MAX_VALUE;
    
@@ -40,54 +44,62 @@ try {
       
       if(distSinceUpdate > 10) {    
         lastLonLat = lonLat;
+        setMsg("Downloading new data...");
         const tiles = await demApplier.updateByLonLat(
           lonLat
         );
       
-        setMsg(`Got tiles: lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} elev: ${Math.round(dem.getElevationFromLonLat(lonLat))}m`);  
-        
-        locar.setElevation(dem.getElevationFromLonLat(lonLat) + 1.6);
+        tiles.length > 0 ? setMsg("Downloaded data.") : showLocation(lonLat);
+
+        locar.setElevation(dem!.getElevationFromLonLat(lonLat) + 1.6);
         
         for(let dataTile of tiles) {
+          
+        
           for(let feature of (dataTile.data as FeatureCollection).features) {
             const props = feature.properties as any;
+            const id = `${dataTile.tile.toString()}:${feature.geometry.type.substring(0, 3)}:${props.osm_id}`;
+
+            if(!indexedObjects.get(id)) {
             
-            const hwy : string | null = props.highway;
+              const hwy : string | null = props.highway;
            
-            switch(feature.geometry.type) {
-              case 'Point':
-                const mesh = new THREE.Mesh(poiGeom, poiMaterial);
-                const coords = (feature.geometry as Point).coordinates;
-                locar.add(mesh, coords[0], coords[1], coords[2] || 0);
-                break;
+              switch(feature.geometry.type) {
+                case 'Point':
+                  const mesh = new THREE.Mesh(poiGeom, poiMaterial);
+                  const coords = (feature.geometry as Point).coordinates;
+                  locar.add(mesh, coords[0], coords[1], coords[2] || 0);
+                  indexedObjects.set(id, mesh);
+                  break;
 
-              case 'LineString':
-                if(hwy) {
-                
-                  const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });
-                  const lineCoords = (feature.geometry as LineString).coordinates;
-                  if(lineCoords.length >= 2) {
-                    locar.addGeoLine(lineCoords, lineMaterial);
-                  }
-                }
-                break;
-
-              case 'MultiLineString':
-                if(hwy) {
-                  const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });  
-                  const mlsCoords = (feature.geometry as MultiLineString).coordinates;
-                  for(let lineCoords of mlsCoords) {
+                case 'LineString':
+                  if(hwy) {
+                    const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });
+                    const lineCoords = (feature.geometry as LineString).coordinates;
                     if(lineCoords.length >= 2) {
-                      locar.addGeoLine(lineCoords, lineMaterial);
+                      indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial));
                     }
                   }
-                }  
+                  break;
+
+                case 'MultiLineString':
+                  if(hwy) {
+                    const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });  
+                    const mlsCoords = (feature.geometry as MultiLineString).coordinates;
+                    for(let lineCoords of mlsCoords) {
+                      if(lineCoords.length >= 2) {
+                        indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial));
+                      }
+                    }
+                  }  
+              }
             }
           }
         }
+      } else {
+        showLocation(lonLat); 
       }
     });
-    //  locar.fakeGps(-0.72, 51.05)
     locar.startGps();
 
     locar.on("gpserror", (ev: GeolocationPositionError) => {
@@ -100,4 +112,8 @@ try {
 
 function setMsg(msg: string) {
   document.getElementById("msg")!.innerHTML = msg;
+}
+
+function showLocation(lonLat: LonLat) {
+   setMsg(`Lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} ${dem === null ? "" : `elev: ${Math.round(dem.getElevationFromLonLat(lonLat))}m`}`);  
 }
