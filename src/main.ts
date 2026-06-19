@@ -11,6 +11,15 @@ const colours : Map <string, number> = new Map([
   ["cycleway" , 0x0000ff ]
 ]);
 
+const widths: Map <string, number> = new Map([
+  ["trunk", 7],
+  ["primary", 5],
+  ["secondary", 5],
+  ["tertiary", 5],
+  ["unclassified", 3],
+  ["residential", 2]
+]);
+
 let dem : DemTiler | null = null;
 
 const indexedObjects = new Map<String, THREE.Mesh>();
@@ -26,7 +35,7 @@ try {
 
    
     const poiMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-    const poiGeom = new THREE.BoxGeometry(10, 10, 10);
+    const poiGeom = new THREE.BoxGeometry(5, 5, 5);
    
     let lastLonLat: LonLat | null = null;
     let distSinceUpdate = Number.MAX_VALUE;
@@ -52,7 +61,7 @@ try {
       
         setMsg("", "loadMsg");
 
-        locar.setElevation(dem!.getElevationFromLonLat(lonLat) + 1.6);
+        locar.setElevation(dem!.getElevationFromLonLat(lonLat) + 2);
         
         for(let dataTile of tiles) {
           
@@ -62,8 +71,8 @@ try {
             const id = `${dataTile.tile.toString()}:${feature.geometry.type.substring(0, 3)}:${props.osm_id}`;
 
             if(!indexedObjects.get(id)) {
-            
-              const hwy : string | null = props.highway;
+              const hwy = props.highway;
+              const width = props.width || widths.get(hwy) || 2;
            
               switch(feature.geometry.type) {
                 case 'Point':
@@ -78,7 +87,7 @@ try {
                     const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });
                     const lineCoords = (feature.geometry as LineString).coordinates;
                     if(lineCoords.length >= 2) {
-                      indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial));
+                      indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
                     }
                   }
                   break;
@@ -89,7 +98,7 @@ try {
                     const mlsCoords = (feature.geometry as MultiLineString).coordinates;
                     for(let lineCoords of mlsCoords) {
                       if(lineCoords.length >= 2) {
-                        indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial));
+                        indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
                       }
                     }
                   }  
