@@ -2,17 +2,18 @@ import * as THREE from 'three';
 import { App, GpsReceivedEvent, LocAR } from 'locar';
 import { DemApplier, DemTiler, FeatureCollection, JsonTiler, LineString, LonLat, MultiLineString, Point } from 'locar-tiler';
 import { Bar, Building, Cup, Marker, Tree } from './simpleModels';
+import { Text } from 'troika-three-text';
 
-const app = new App({ cameraOptions : { hFov: 80, near: 0.1, far: 1000 } });
+const app = new App({ cameraOptions: { hFov: 80, near: 0.1, far: 1000 } });
 
-const colours : Map <string, number> = new Map([
-  ["path" , 0x00ff00 ],
-  ["footway" , 0x00ff00 ],
-  ["bridleway" , 0xaa5500 ],
-  ["cycleway" , 0x0000ff ]
+const colours: Map<string, number> = new Map([
+  ["path", 0x00ff00],
+  ["footway", 0x00ff00],
+  ["bridleway", 0xaa5500],
+  ["cycleway", 0x0000ff]
 ]);
 
-const widths: Map <string, number> = new Map([
+const widths: Map<string, number> = new Map([
   ["trunk", 7],
   ["primary", 5],
   ["secondary", 5],
@@ -21,131 +22,156 @@ const widths: Map <string, number> = new Map([
   ["residential", 2]
 ]);
 
-let dem : DemTiler | null = null;
+let dem: DemTiler | null = null;
 
 const indexedObjects = new Map<String, THREE.Object3D>();
 
-try {
-    const locar = await app.start();
-    locar.setElevation(100);
-    const ambientLight = new THREE.AmbientLight(0xffffff, 3);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 6);
-    directionalLight.position.set(0, 1, 0.1);
-    locar.scene.add(ambientLight);
-    locar.scene.add(directionalLight);
-    
-    const demApplier = new DemApplier(  
-       dem = new DemTiler("/dem/{z}/{x}/{y}.png"),
-       new JsonTiler("/map/{z}/{x}/{y}.json?outProj=4326")
-    );
-   
-    let lastLonLat: LonLat | null = null;
-    let distSinceUpdate = Number.MAX_VALUE;
+const texts: any[] = [];
 
-    setMsg("Waiting for GPS...", "loadMsg");
-   
-    locar.on("gpsupdate", async(ev: GpsReceivedEvent) => {
-       
-      setMsg("", "loadMsg");
-      
-      const lonLat = new LonLat(
-        ev.position.coords.longitude,
-        ev.position.coords.latitude
+try {
+  const locar = await app.start();
+  locar.setElevation(100);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 3);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 6);
+  directionalLight.position.set(0, 1, 0.1);
+  locar.scene.add(ambientLight);
+  locar.scene.add(directionalLight);
+
+  const demApplier = new DemApplier(
+    dem = new DemTiler("/dem/{z}/{x}/{y}.png"),
+    new JsonTiler("/map/{z}/{x}/{y}.json?outProj=4326")
+  );
+
+  let lastLonLat: LonLat | null = null;
+  let distSinceUpdate = Number.MAX_VALUE;
+
+  setMsg("Waiting for GPS...", "loadMsg");
+
+  locar.on("gpsupdate", async (ev: GpsReceivedEvent) => {
+
+    setMsg("", "loadMsg");
+
+    const lonLat = new LonLat(
+      ev.position.coords.longitude,
+      ev.position.coords.latitude
+    );
+
+
+    if (lastLonLat !== null) {
+      distSinceUpdate = LocAR.haversineDist(lonLat, lastLonLat);
+    }
+
+    if (distSinceUpdate > 10) {
+      lastLonLat = lonLat;
+      setMsg("Downloading new data...", "loadMsg");
+      const tiles = await demApplier.updateByLonLat(
+        lonLat
       );
 
-     
-      if(lastLonLat !== null) {
-        distSinceUpdate = LocAR.haversineDist(lonLat, lastLonLat);
-      }
-      
-      if(distSinceUpdate > 10) {    
-        lastLonLat = lonLat;
-        setMsg("Downloading new data...", "loadMsg");
-        const tiles = await demApplier.updateByLonLat(
-          lonLat
-        );
-      
-        setMsg("", "loadMsg");
+      setMsg("", "loadMsg");
 
-        locar.setElevation(dem!.getElevationFromLonLat(lonLat) + 2);
-        
-        for(let dataTile of tiles) {
-          
-        
-          for(let feature of (dataTile.data as FeatureCollection).features) {
-            const props = feature.properties as any;
-            const id = `${dataTile.tile.toString()}:${feature.geometry.type.substring(0, 3)}:${props.osm_id}`;
+      locar.setElevation(dem!.getElevationFromLonLat(lonLat) + 2);
 
-            if(!indexedObjects.get(id)) {
-              const hwy = props.highway;
-              const width = props.width || widths.get(hwy) || 2;
-           
-              switch(feature.geometry.type) {
-              
+      for (let dataTile of tiles) {
 
-                case 'Point':
-                  let object: THREE.Object3D | null = null;
-                  if(props.amenity == 'pub') { 
-                    object = Bar();
-                  } else if (props.amenity == 'cafe') {
-                    object = Cup();
-                  } else if (props.natural == 'tree') {
-                    object = Tree();
-                  } else if (props.shop !== undefined || props.building !== undefined) {
-                    object = Building();
-                  } else if (props.natural == "peak") {
-                    const geom = new THREE.ConeGeometry(1, 3);
-                    const material = new THREE.MeshStandardMaterial({color: 0xff00ff});
-                    object = new THREE.Mesh(geom, material);
-                  } else {
-                    object = Marker();
+
+        for (let feature of (dataTile.data as FeatureCollection).features) {
+          const props = feature.properties as any;
+          const id = `${dataTile.tile.toString()}:${feature.geometry.type.substring(0, 3)}:${props.osm_id}`;
+
+          if (!indexedObjects.get(id)) {
+            const hwy = props.highway;
+            const width = props.width || widths.get(hwy) || 2;
+
+            switch (feature.geometry.type) {
+
+
+              case 'Point':
+                //let object: THREE.Object3D | null = null;
+                const object = new THREE.Group();
+                if (props.amenity == 'pub') {
+                  object.add(Bar());
+                } else if (props.amenity == 'cafe') {
+                  object.add(Cup());
+                } else if (props.natural == 'tree') {
+                  object.add(Tree());
+                } else if (props.shop !== undefined || props.building !== undefined) {
+                  object.add(Building());
+                } else if (props.natural == "peak") {
+                  const geom = new THREE.ConeGeometry(1, 3);
+                  const material = new THREE.MeshStandardMaterial({ color: 0xff00ff });
+                  object.add(new THREE.Mesh(geom, material));
+                } else {
+                  object.add(Marker());
+                }
+                if (props.name) {
+                  const text = new Text();
+                  text.text = props.name;
+                  text.position.set(0, -1, 0);
+                  text.fontSize = 2;
+                  text.anchorX = 'center';
+                  text.font = 'https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff';
+                  text.color = 0xffffff;
+                  text.sync();
+                  object.add(text);
+                  texts.push(text);
+                }
+
+                
+                console.log("created text");
+
+                const coords = (feature.geometry as Point).coordinates;
+                locar.add(object, coords[0], coords[1], coords[2] || 0);
+                indexedObjects.set(id, object);
+                break;
+
+              case 'LineString':
+                if (hwy) {
+                  const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });
+                  const lineCoords = (feature.geometry as LineString).coordinates;
+                  if (lineCoords.length >= 2) {
+                    indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
                   }
-                  const coords = (feature.geometry as Point).coordinates;
-                  locar.add(object, coords[0], coords[1], coords[2] || 0);
-                  indexedObjects.set(id, object);
-                  break;
+                }
+                break;
 
-                case 'LineString':
-                  if(hwy) {
-                    const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });
-                    const lineCoords = (feature.geometry as LineString).coordinates;
-                    if(lineCoords.length >= 2) {
+              case 'MultiLineString':
+                if (hwy) {
+                  const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });
+                  const mlsCoords = (feature.geometry as MultiLineString).coordinates;
+                  for (let lineCoords of mlsCoords) {
+                    if (lineCoords.length >= 2) {
                       indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
                     }
                   }
-                  break;
-
-                case 'MultiLineString':
-                  if(hwy) {
-                    const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });  
-                    const mlsCoords = (feature.geometry as MultiLineString).coordinates;
-                    for(let lineCoords of mlsCoords) {
-                      if(lineCoords.length >= 2) {
-                        indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
-                      }
-                    }
-                  }  
-              }
+                }
             }
           }
         }
       }
-       showLocation(lonLat);
-    });
-    locar.startGps();
+    }
+    showLocation(lonLat);
+  });
+  locar.startGps();
 
-    locar.on("gpserror", (ev: GeolocationPositionError) => {
-        alert(ev.code);
-    });
+  locar.on("gpserror", (ev: GeolocationPositionError) => {
+    alert(ev.code);
+  });
 
-} catch(e: any) {
-    alert(e);
+  window.addEventListener("unload", () => {
+    for(const text of texts) {
+      locar.scene.remove(text);
+      text.dispose();
+    }
+  })
+} catch (e: any) {
+  alert(e);
 }
 
 function setMsg(msg: string, elementId: string = "msg") {
   document.getElementById(elementId)!.innerHTML = msg;
 }
 
-function showLocation(lonLat: LonLat) { 
-   setMsg(`Lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} ${dem === null ? "" : `elev: ${Math.round(dem.getElevationFromLonLat(lonLat))}m`}`);  
+function showLocation(lonLat: LonLat) {
+  setMsg(`Lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} ${dem === null ? "" : `elev: ${Math.round(dem.getElevationFromLonLat(lonLat))}m`}`);
 }

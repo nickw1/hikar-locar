@@ -8,5 +8,7 @@
         "module": "preserve",
         "moduleResolution": "bundler"
     }, 
-    "files" : [ "server.ts", "src/main.ts" ]
+    "files" : [ "server.ts", "src/main.ts"],
+    "include": [ "types/*.d.ts" ]
+   
 }
