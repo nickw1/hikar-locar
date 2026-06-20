@@ -41,9 +41,13 @@ try {
    
     let lastLonLat: LonLat | null = null;
     let distSinceUpdate = Number.MAX_VALUE;
+
+    setMsg("Waiting for GPS...", "loadMsg");
    
     locar.on("gpsupdate", async(ev: GpsReceivedEvent) => {
        
+      setMsg("", "loadMsg");
+      
       const lonLat = new LonLat(
         ev.position.coords.longitude,
         ev.position.coords.latitude
