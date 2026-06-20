@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { App, GpsReceivedEvent, LocAR } from 'locar';
 import { DemApplier, DemTiler, FeatureCollection, JsonTiler, LineString, LonLat, MultiLineString, Point } from 'locar-tiler';
+import { Bar, Building, Cup, Marker, Tree } from './simpleModels';
 
 const app = new App({ cameraOptions : { hFov: 80, near: 0.1, far: 1000 } });
 
@@ -22,20 +23,21 @@ const widths: Map <string, number> = new Map([
 
 let dem : DemTiler | null = null;
 
-const indexedObjects = new Map<String, THREE.Mesh>();
+const indexedObjects = new Map<String, THREE.Object3D>();
 
 try {
     const locar = await app.start();
     locar.setElevation(100);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 3);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 6);
+    directionalLight.position.set(0, 1, 0.1);
+    locar.scene.add(ambientLight);
+    locar.scene.add(directionalLight);
     
     const demApplier = new DemApplier(  
        dem = new DemTiler("/dem/{z}/{x}/{y}.png"),
        new JsonTiler("/map/{z}/{x}/{y}.json?outProj=4326")
     );
-
-   
-    const poiMaterial = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-    const poiGeom = new THREE.BoxGeometry(5, 5, 5);
    
     let lastLonLat: LonLat | null = null;
     let distSinceUpdate = Number.MAX_VALUE;
@@ -75,16 +77,33 @@ try {
               const width = props.width || widths.get(hwy) || 2;
            
               switch(feature.geometry.type) {
+              
+
                 case 'Point':
-                  const mesh = new THREE.Mesh(poiGeom, poiMaterial);
+                  let object: THREE.Object3D | null = null;
+                  if(props.amenity == 'pub') { 
+                    object = Bar();
+                  } else if (props.amenity == 'cafe') {
+                    object = Cup();
+                  } else if (props.natural == 'tree') {
+                    object = Tree();
+                  } else if (props.shop !== undefined || props.building !== undefined) {
+                    object = Building();
+                  } else if (props.natural == "peak") {
+                    const geom = new THREE.ConeGeometry(1, 3);
+                    const material = new THREE.MeshStandardMaterial({color: 0xff00ff});
+                    object = new THREE.Mesh(geom, material);
+                  } else {
+                    object = Marker();
+                  }
                   const coords = (feature.geometry as Point).coordinates;
-                  locar.add(mesh, coords[0], coords[1], coords[2] || 0);
-                  indexedObjects.set(id, mesh);
+                  locar.add(object, coords[0], coords[1], coords[2] || 0);
+                  indexedObjects.set(id, object);
                   break;
 
                 case 'LineString':
                   if(hwy) {
-                    const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });
+                    const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });
                     const lineCoords = (feature.geometry as LineString).coordinates;
                     if(lineCoords.length >= 2) {
                       indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
@@ -94,7 +113,7 @@ try {
 
                 case 'MultiLineString':
                   if(hwy) {
-                    const lineMaterial = new THREE.MeshBasicMaterial({ color: colours.get(hwy) ?? 0xffffff });  
+                    const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });  
                     const mlsCoords = (feature.geometry as MultiLineString).coordinates;
                     for(let lineCoords of mlsCoords) {
                       if(lineCoords.length >= 2) {
