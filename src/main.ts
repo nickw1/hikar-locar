@@ -22,11 +22,12 @@ const widths: Map<string, number> = new Map([
   ["residential", 2]
 ]);
 
+const noAccess = ["private", "no"];
+
 let dem: DemTiler | null = null;
 
 const indexedObjects = new Map<String, THREE.Object3D>();
-
-const texts: any[] = [];
+const highwayMaterials = new Map<String, THREE.Material>();
 
 try {
   const locar = await app.start();
@@ -83,11 +84,14 @@ try {
             const hwy = props.highway;
             const width = props.width || widths.get(hwy) || 2;
 
+            const accessibleHighway = hwy && hwy.indexOf("motorway") == -1 && noAccess.indexOf(props.access) == -1 && noAccess.indexOf(props.foot) == -1;
+
+            let lineMaterial: THREE.Material | null = null;
+
             switch (feature.geometry.type) {
 
 
               case 'Point':
-                //let object: THREE.Object3D | null = null;
                 const object = new THREE.Group();
                 if (props.amenity == 'pub') {
                   object.add(Bar());
@@ -114,11 +118,8 @@ try {
                   text.color = 0xffffff;
                   text.sync();
                   object.add(text);
-                  texts.push(text);
                 }
 
-                
-                console.log("created text");
 
                 const coords = (feature.geometry as Point).coordinates;
                 locar.add(object, coords[0], coords[1], coords[2] || 0);
@@ -126,8 +127,8 @@ try {
                 break;
 
               case 'LineString':
-                if (hwy) {
-                  const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });
+                if (accessibleHighway) {
+                  lineMaterial = handleLineMaterial(hwy);
                   const lineCoords = (feature.geometry as LineString).coordinates;
                   if (lineCoords.length >= 2) {
                     indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
@@ -136,8 +137,8 @@ try {
                 break;
 
               case 'MultiLineString':
-                if (hwy) {
-                  const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });
+                if (accessibleHighway) {
+                  lineMaterial = handleLineMaterial(hwy);
                   const mlsCoords = (feature.geometry as MultiLineString).coordinates;
                   for (let lineCoords of mlsCoords) {
                     if (lineCoords.length >= 2) {
@@ -157,13 +158,6 @@ try {
   locar.on("gpserror", (ev: GeolocationPositionError) => {
     alert(ev.code);
   });
-
-  window.addEventListener("unload", () => {
-    for(const text of texts) {
-      locar.scene.remove(text);
-      text.dispose();
-    }
-  })
 } catch (e: any) {
   alert(e);
 }
@@ -174,4 +168,14 @@ function setMsg(msg: string, elementId: string = "msg") {
 
 function showLocation(lonLat: LonLat) {
   setMsg(`Lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} ${dem === null ? "" : `elev: ${Math.round(dem.getElevationFromLonLat(lonLat))}m`}`);
+}
+
+function handleLineMaterial(hwy: string): THREE.Material {
+  if (!highwayMaterials.get(hwy)) {
+    const lineMaterial = new THREE.MeshStandardMaterial({ color: colours.get(hwy) ?? 0xffffff, transparent: true, opacity: 0.7 });
+    highwayMaterials.set(hwy, lineMaterial);
+    return lineMaterial;
+  } else {
+    return highwayMaterials.get(hwy)!;
+  }
 }
