@@ -137,7 +137,7 @@ try {
               case 'LineString':
                 if (accessibleHighway) {
                   lineMaterial = handleLineMaterial(hwy);
-                  const lineCoords = (feature.geometry as LineString).coordinates;
+                  const lineCoords = (feature.geometry as LineString).coordinates.filter(coords => coords[2] !== null);
                   if (lineCoords.length >= 2) {
                     indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
                   }
@@ -147,7 +147,7 @@ try {
               case 'MultiLineString':
                 if (accessibleHighway) {
                   lineMaterial = handleLineMaterial(hwy);
-                  const mlsCoords = (feature.geometry as MultiLineString).coordinates;
+                  const mlsCoords = (feature.geometry as MultiLineString).coordinates.filter(coords => coords[2] !== null);
                   for (let lineCoords of mlsCoords) {
                     if (lineCoords.length >= 2) {
                       indexedObjects.set(id, locar.addGeoLine(lineCoords, lineMaterial, width));
