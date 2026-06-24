@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { App, GpsReceivedEvent, LocAR } from 'locar';
-import { DemApplier, DemTiler, FeatureCollection, JsonTiler, LineString, LonLat, MultiLineString, Point } from 'locar-tiler';
+import { DEM, DemApplier, DemTiler, EastNorth, FeatureCollection, JsonTiler, LineString, LonLat, MultiLineString, Point } from 'locar-tiler';
 import { Bar, Building, Cup, Marker, Tree } from './simpleModels';
+import TerrainGenerator from './terrain';
 import { Text } from 'troika-three-text';
 
-const app = new App({ cameraOptions: { hFov: 80, near: 0.1, far: 1000 } });
+const app = new App({ cameraOptions: { hFov: 80, near: 0.1, far: 4000 } });
 
 const colours: Map<string, number> = new Map([
   ["path", 0x00ff00],
@@ -24,14 +25,15 @@ const widths: Map<string, number> = new Map([
 
 const noAccess = ["private", "no"];
 
-let dem: DemTiler | null = null;
+let demTiler: DemTiler | null = null;
 
 const indexedObjects = new Map<String, THREE.Object3D>();
 const highwayMaterials = new Map<String, THREE.Material>();
-
+const origin: EastNorth | null = null;
 try {
   const locar = await app.start();
   locar.setElevation(100);
+
   const ambientLight = new THREE.AmbientLight(0xffffff, 3);
   const directionalLight = new THREE.DirectionalLight(0xffffff, 6);
   directionalLight.position.set(0, 1, 0.1);
@@ -39,7 +41,7 @@ try {
   locar.scene.add(directionalLight);
 
   const demApplier = new DemApplier(
-    dem = new DemTiler("/dem/{z}/{x}/{y}.png"),
+    demTiler = new DemTiler("/dem/{z}/{x}/{y}.png"),
     new JsonTiler("/map/{z}/{x}/{y}.json?outProj=4326")
   );
 
@@ -57,7 +59,6 @@ try {
       ev.position.coords.latitude
     );
 
-
     if (lastLonLat !== null) {
       distSinceUpdate = LocAR.haversineDist(lonLat, lastLonLat);
     }
@@ -65,16 +66,22 @@ try {
     if (distSinceUpdate > 10) {
       lastLonLat = lonLat;
       setMsg("Downloading new data...", "loadMsg");
-      const tiles = await demApplier.updateByLonLat(
+      const newTiles = await demApplier.updateByLonLat(
         lonLat
       );
 
       setMsg("", "loadMsg");
 
-      locar.setElevation(dem!.getElevationFromLonLat(lonLat) + 2);
+      locar.setElevation(demTiler!.getElevationFromLonLat(lonLat) + 2);
 
-      for (let dataTile of tiles) {
+      for (let dataTile of newTiles) {
+        const tileKey = dataTile.tile.getIndex();
 
+        const newDem = demTiler?.dataTiles.get(tileKey)?.data;
+        if (newDem) {
+          const terrainGenerator = new TerrainGenerator(newDem);
+          locar.scene.add(terrainGenerator.genTerrain(locar));
+        }
 
         for (let feature of (dataTile.data as FeatureCollection).features) {
           const props = feature.properties as any;
@@ -94,25 +101,26 @@ try {
               case 'Point':
                 const object = new THREE.Group();
                 if (props.amenity == 'pub') {
-                  object.add(Bar());
+                  object.add(Bar(4));
                 } else if (props.amenity == 'cafe') {
-                  object.add(Cup());
+                  object.add(Cup(4));
                 } else if (props.natural == 'tree') {
-                  object.add(Tree());
+                  object.add(Tree(4));
                 } else if (props.shop !== undefined || props.building !== undefined) {
-                  object.add(Building());
+                  object.add(Building(4));
                 } else if (props.natural == "peak") {
-                  const geom = new THREE.ConeGeometry(1, 3);
+                  const geom = new THREE.ConeGeometry(8, 24);
                   const material = new THREE.MeshStandardMaterial({ color: 0xff00ff });
                   object.add(new THREE.Mesh(geom, material));
                 } else {
-                  object.add(Marker());
+                  object.add(Marker(4));
                 }
-                if (props.name) {
+                const label = props.name || props.amenity || props.place || props.natural || props.shop;
+                if (label) {
                   const text = new Text();
-                  text.text = props.name;
-                  text.position.set(0, -1, 0);
-                  text.fontSize = 2;
+                  text.text = label.replace("_", " ");
+                  text.position.set(0, 20, 0);
+                  text.fontSize = 4;
                   text.anchorX = 'center';
                   text.font = 'https://fonts.gstatic.com/s/roboto/v18/KFOmCnqEu92Fr1Mu4mxM.woff';
                   text.color = 0xffffff;
@@ -167,7 +175,7 @@ function setMsg(msg: string, elementId: string = "msg") {
 }
 
 function showLocation(lonLat: LonLat) {
-  setMsg(`Lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} ${dem === null ? "" : `elev: ${Math.round(dem.getElevationFromLonLat(lonLat))}m`}`);
+  setMsg(`Lon ${lonLat.longitude.toFixed(3)} lat ${lonLat.latitude.toFixed(3)} ${demTiler === null ? "" : `elev: ${Math.round(demTiler.getElevationFromLonLat(lonLat))}m`}`);
 }
 
 function handleLineMaterial(hwy: string): THREE.Material {
