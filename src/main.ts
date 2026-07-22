@@ -29,7 +29,7 @@ let demTiler: DemTiler | null = null;
 
 const indexedObjects = new Map<String, THREE.Object3D>();
 const highwayMaterials = new Map<String, THREE.Material>();
-const origin: EastNorth | null = null;
+
 try {
   const locar = await app.start();
   locar.setElevation(100);
@@ -168,6 +168,25 @@ try {
   });
 } catch (e: any) {
   alert(e);
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('svcw.js')
+    .then(registration => {
+      let serviceWorker;
+      if (registration.installing) {
+        serviceWorker = registration.installing;
+      } else if (registration.waiting) {
+        serviceWorker = registration.waiting;
+      } else if (registration.active) {
+        serviceWorker = registration.active;
+      }
+
+    })
+
+    .catch(e => {
+      console.error(`Service worker registration failed: ${e}`);
+    });
 }
 
 function setMsg(msg: string, elementId: string = "msg") {

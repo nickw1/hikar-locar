@@ -9,6 +9,5 @@
         "moduleResolution": "bundler"
     }, 
     "files" : [ "server.ts", "src/main.ts"],
-    "include": [ "types/*.d.ts" ]
-   
+    "include": [ "types/*.d.ts" ],   
 }

@@ -1,6 +1,6 @@
 import express from 'express';
 import ViteExpress from 'vite-express';
-import fs from 'fs';
+import fs from 'node:fs';
 import { Tile } from 'locar-tiler';
 
 import db from './db';
